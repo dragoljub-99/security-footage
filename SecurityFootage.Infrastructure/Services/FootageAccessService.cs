@@ -1,0 +1,189 @@
+using Microsoft.EntityFrameworkCore;
+using SecurityFootage.Infrastructure.Persistence;
+using SecurityFootage.Domain.Entities;
+using SecurityFootage.Domain;
+using SecurityFootage.Domain.Interfaces;
+using SecurityFootage.Domain.Results;
+using SecurityFootage.Infrastructure.Services;
+
+namespace SecurityFootageExercise.Infrastructure.Services
+{
+    public class FootageAccessService : IFootageAccessService
+    {
+        private readonly SecurityFootageDbContext _dbContext;
+        private readonly IAuditLogService _logsServices;
+        private readonly IEventQueueService _eventQueueService;
+        private readonly SasUrlClient _generateSasLinkService;
+
+        public FootageAccessService(SecurityFootageDbContext dbContext, IAuditLogService logsServices,
+                                    IEventQueueService eventQueueService, SasUrlClient generateSasLink)
+        {
+            _dbContext = dbContext;
+            _logsServices = logsServices;
+            _eventQueueService = eventQueueService;
+            _generateSasLinkService = generateSasLink;
+        }
+
+        public async Task<CreateUserResult> CreateUserAsync(User createUser, string nickName, CancellationToken ct)
+        {
+            DateTime now = DateTime.UtcNow;
+            var user = await _dbContext.Users.FirstOrDefaultAsync(u => u.Nickname == nickName, ct);
+
+            if (user == null)
+            {
+                 var log = new AuditLog
+                 {
+                     Action = AuditAction.CREATEUSER,
+                     Result = AuditOutcome.USERNOTFOUND,
+                     Nickname = nickName,
+                     CreatedAtUtc = now
+                 };
+                _logsServices.AddAudit(log);
+                await _dbContext.SaveChangesAsync(ct);
+                return new CreateUserResult(RequestResult.InvalidUser, null);
+            }
+            
+            var isUserExist = await _dbContext.Users.AnyAsync(u => u.Nickname == createUser.Nickname, ct);
+
+            if (isUserExist)
+            {
+                var log = new AuditLog
+                {
+                    Action = AuditAction.CREATEUSER,
+                    Result = AuditOutcome.CONFLICT,
+                    Nickname = nickName,
+                    CreatedAtUtc = now
+                };
+                _logsServices.AddAudit(log);
+                await _dbContext.SaveChangesAsync(ct);
+                return new CreateUserResult(RequestResult.Conflict, null);
+            }
+            var newUser = new User
+            {
+                Nickname = createUser.Nickname,
+                CreatedAtUtc = now
+            };
+
+             _dbContext.Users.Add(newUser);
+             
+             _logsServices.AddAudit(new AuditLog
+             {
+                 UserId = user.Id,
+                 Action = AuditAction.CREATEUSER,
+                 Result = AuditOutcome.SUCCEEDED,
+                 Nickname = nickName,
+                 CreatedAtUtc = now
+             });
+
+             await _dbContext.SaveChangesAsync(ct);
+
+             return new CreateUserResult(RequestResult.Success, newUser);
+        }
+
+        public async Task<FootageAccessResponse> RequestFootageAccessAsync(Location location, string nickName, CancellationToken ct)
+        {
+            DateTime now = DateTime.UtcNow;
+
+            Location? savedLocation = null;
+            string? sasUrl = null;
+            
+            RequestResult result = RequestResult.InvalidUser;
+            AuditOutcome outcome = AuditOutcome.USERNOTFOUND;
+
+            var user = await _dbContext.Users.FirstOrDefaultAsync(u => u.Nickname == nickName, ct);
+
+            if (user != null)
+            {
+                result = RequestResult.InvalidAccess;
+                outcome = AuditOutcome.ACCESSDENIED;
+
+                savedLocation = await _dbContext.Locations.FirstOrDefaultAsync(l => 
+                                                            l.Country == location.Country && 
+                                                            l.City == location.City, ct);
+
+                if (savedLocation == null)
+                {
+                    outcome = AuditOutcome.LOCATIONNOTFOUND;
+                }
+                else
+                {
+                    bool hasAccess = await _dbContext.UserAccesses.AnyAsync(ua => 
+                                               ua.UserId == user.Id &&
+                                               ua.LocationId == savedLocation.Id, ct);
+
+                    if (hasAccess)
+                    {
+                        var footageInfo = await _dbContext.FootagesInfo.FirstOrDefaultAsync(fi => 
+                                                  fi.LocationId == savedLocation.Id, ct);
+
+                        if (footageInfo == null)
+                        {
+                            result = RequestResult.FootageNotFound;
+                            outcome = AuditOutcome.FOOTAGENOTFOUND;
+                        }
+                        else
+                        {
+                            try
+                            {
+                                sasUrl = await _generateSasLinkService.GetSasUrlAsync(footageInfo.BlobName, ct);
+
+                                if (string.IsNullOrWhiteSpace(sasUrl))
+                                {
+                                    sasUrl = null;
+                                    result = RequestResult.SasGenerationFailed;
+                                    outcome = AuditOutcome.SASGENERATIONFAILED;
+                                }
+                                else
+                                {
+                                    result = RequestResult.Success;
+                                    outcome = AuditOutcome.SUCCEEDED;
+                                }
+                            }
+                            catch
+                            {
+                                sasUrl = null;
+                                result = RequestResult.SasGenerationFailed;
+                                outcome = AuditOutcome.SASGENERATIONFAILED;
+                            }
+                        }
+                    }
+                }
+            }
+
+            _logsServices.AddAudit(new AuditLog
+            {
+                UserId = user?.Id,
+                LocationId = savedLocation?.Id,
+                RequestedCountry = location.Country,
+                RequestedCity = location.City,
+                Action = AuditAction.REQUEST_FOOTAGE,
+                Result = outcome,
+                Nickname = user?.Nickname,
+                CreatedAtUtc = now
+            });
+
+            if (result == RequestResult.Success && user != null && savedLocation != null)
+            {
+                _eventQueueService.Enqueue(new EventQueue
+                {
+                    UserId = user.Id,
+                    Nickname = user.Nickname,
+                    LocationId = savedLocation.Id,
+                    Status = QueueProcessingStatus.Pending,
+                    CreatedAtUtc = now
+                });
+            }
+
+            await _dbContext.SaveChangesAsync(ct);
+
+            return new FootageAccessResponse(result, sasUrl);
+        }
+
+        public async Task<User?> GetUserByNicknameAsync(string nickName, CancellationToken ct)
+        {
+            return await _dbContext.Users.FirstOrDefaultAsync(u => u.Nickname == nickName, ct);
+        }
+
+        
+    }
+}
