@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.14" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="SecurityFootage.Sas.Api.Infrastructure\SecurityFootage.Sas.Api.Infrastructure.csproj" />
+    <Compile Remove="SecurityFootage.Sas.Api.Infrastructure\**\*.cs" />
+    <Content Remove="SecurityFootage.Sas.Api.Infrastructure\**\*" />
+    <None Remove="SecurityFootage.Sas.Api.Infrastructure\**\*" />
+  </ItemGroup>
+
+</Project>
