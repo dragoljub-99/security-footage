@@ -1,13 +1,10 @@
-using Apache.Arrow;
-using Microsoft.VisualBasic;
 using Azure.Identity;
 using Azure.Storage.Blobs;
-using System.Diagnostics.CodeAnalysis;
 using Azure.Storage.Blobs.Models;
 using Azure.Storage.Sas;
-using DownloadFootageSas.Infrastructure.Interfaces;
+using SecurityFootage.Sas.Infrastructure.Interfaces;
 
-namespace DownloadFootageSas.Infrastructure.Services
+namespace SecurityFootage.Sas.Infrastructure.Services
 {
     public class SasService : ISasService
     {

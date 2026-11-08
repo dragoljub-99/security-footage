@@ -11,10 +11,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="SecurityFootage.Sas.Api.Infrastructure\SecurityFootage.Sas.Api.Infrastructure.csproj" />
-    <Compile Remove="SecurityFootage.Sas.Api.Infrastructure\**\*.cs" />
-    <Content Remove="SecurityFootage.Sas.Api.Infrastructure\**\*" />
-    <None Remove="SecurityFootage.Sas.Api.Infrastructure\**\*" />
+    <ProjectReference Include="..\SecurityFootage.Sas.Infrastructure\SecurityFootage.Sas.Infrastructure.csproj" />
   </ItemGroup>
 
 </Project>

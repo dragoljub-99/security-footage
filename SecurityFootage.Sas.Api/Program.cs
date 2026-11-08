@@ -1,5 +1,5 @@
-using DownloadFootageSas.Infrastructure.Services;
-using DownloadFootageSas.Infrastructure.Interfaces;
+using SecurityFootage.Sas.Infrastructure.Services;
+using SecurityFootage.Sas.Infrastructure.Interfaces;
 using Microsoft.AspNetCore.Mvc;
 
 var builder = WebApplication.CreateBuilder(args);

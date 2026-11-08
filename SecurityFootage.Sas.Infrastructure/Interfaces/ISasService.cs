@@ -1,4 +1,4 @@
-namespace DownloadFootageSas.Infrastructure.Interfaces
+namespace SecurityFootage.Sas.Infrastructure.Interfaces
 {
     public interface ISasService
     {
