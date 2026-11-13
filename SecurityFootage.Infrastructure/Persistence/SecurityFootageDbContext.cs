@@ -84,7 +84,7 @@ namespace SecurityFootage.Infrastructure.Persistence
 
                 entity.HasKey(x => x.Id);
                 
-                entity.Property(x => x.Status)
+                entity.Property(x => x.Nickname)
                     .IsRequired();
 
                 entity.Property(x => x.CreatedAtUtc)
@@ -93,6 +93,11 @@ namespace SecurityFootage.Infrastructure.Persistence
                 entity.HasOne(x => x.User)
                       .WithMany(e => e.EventQueues)
                       .HasForeignKey(u => u.UserId)
+                      .IsRequired();
+
+                entity.HasOne(x => x.Location)
+                      .WithMany(e => e.EventQueues)
+                      .HasForeignKey(l => l.LocationId)
                       .IsRequired();
             });
 

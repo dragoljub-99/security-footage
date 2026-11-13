@@ -8,7 +8,6 @@ namespace SecurityFootage.Domain.Entities
         public User User {get; set;} = null!;
         public long? LocationId {get; set;}
         public Location? Location {get; set;}
-        public QueueProcessingStatus Status {get; set;}
         public DateTime CreatedAtUtc {get; set;} 
     }
 }

@@ -9,6 +9,7 @@ namespace SecurityFootage.Domain.Entities
         public string City {get; set;} = null!;
         public ICollection<UserLocationAccess> UserAccesses {get; set;} = new List<UserLocationAccess>();
         public ICollection<FootageInformation> FootagesInfo {get; set;} = new List<FootageInformation>();
+        public ICollection<EventQueue> EventQueues {get; set;} = new List<EventQueue>();
 
     }
 }
