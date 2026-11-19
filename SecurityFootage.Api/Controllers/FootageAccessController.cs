@@ -37,7 +37,7 @@ namespace SecurityFootage.Api.Controllers
             }
             if (result.Result == RequestResult.InvalidAccess)
             {
-                return Forbid();
+                return StatusCode(StatusCodes.Status403Forbidden, result.Result);
             }
             if (result.Result == RequestResult.FootageNotFound)
             {

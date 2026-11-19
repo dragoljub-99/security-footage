@@ -47,4 +47,11 @@ Thumbs.db
 Desktop.ini
 *.pubxml.user
 *.publishsettings
-
+**/Migrations/20261114170050_EventProcessingTableRefactor.cs
+**/Migrations/20261114170050_EventProcessingTableRefactor.Designer.cs
+**/Migrations/20261114170847_EventProcessingTableRefactorTwo.cs
+**/Migrations/20261114170847_EventProcessingTableRefactorTwo.Designer.cs
+**/Migrations/20261114171420_RecreateEventQueues.cs
+**/Migrations/20261114171420_RecreateEventQueues.Designer.cs
+**/Migrations/20261114171503_RecreateEventQueues2.cs
+**/Migrations/20261114171503_RecreateEventQueues2.Designer.cs

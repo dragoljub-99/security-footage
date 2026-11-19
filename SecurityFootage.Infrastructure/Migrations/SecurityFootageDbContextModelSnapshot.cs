@@ -78,15 +78,12 @@ namespace SecurityFootage.Infrastructure.Migrations
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("datetime2");
 
-                    b.Property<long?>("LocationId")
+                    b.Property<long>("LocationId")
                         .HasColumnType("bigint");
 
                     b.Property<string>("Nickname")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
-
-                    b.Property<int>("Status")
-                        .HasColumnType("int");
 
                     b.Property<long>("UserId")
                         .HasColumnType("bigint");
@@ -216,8 +213,10 @@ namespace SecurityFootage.Infrastructure.Migrations
             modelBuilder.Entity("SecurityFootage.Domain.Entities.EventQueue", b =>
                 {
                     b.HasOne("SecurityFootage.Domain.Entities.Location", "Location")
-                        .WithMany()
-                        .HasForeignKey("LocationId");
+                        .WithMany("EventQueues")
+                        .HasForeignKey("LocationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
 
                     b.HasOne("SecurityFootage.Domain.Entities.User", "User")
                         .WithMany("EventQueues")
@@ -262,6 +261,8 @@ namespace SecurityFootage.Infrastructure.Migrations
 
             modelBuilder.Entity("SecurityFootage.Domain.Entities.Location", b =>
                 {
+                    b.Navigation("EventQueues");
+
                     b.Navigation("FootagesInfo");
 
                     b.Navigation("UserAccesses");

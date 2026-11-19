@@ -29,7 +29,7 @@ namespace SecurityFootage.Infrastructure.Services
             services.AddScoped<IAuditLogService, AuditLogService>();
             services.AddScoped<IDatabaseInitializer, DatabaseInitializer>();
             services.AddScoped<IFootageAccessService,FootageAccessService>();
-            services.AddScoped<IEventQueueService, EventQueueService>();
+            services.AddScoped<EventProcessing>();
 
             return services;
         }

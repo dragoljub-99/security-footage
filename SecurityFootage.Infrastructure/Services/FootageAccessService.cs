@@ -14,14 +14,16 @@ namespace SecurityFootageExercise.Infrastructure.Services
         private readonly IAuditLogService _logsServices;
         private readonly IEventQueueService _eventQueueService;
         private readonly SasUrlClient _generateSasLinkService;
+        private readonly EventProcessing _eventProcessingService;
 
         public FootageAccessService(SecurityFootageDbContext dbContext, IAuditLogService logsServices,
-                                    IEventQueueService eventQueueService, SasUrlClient generateSasLink)
+                                    IEventQueueService eventQueueService, SasUrlClient generateSasLink, EventProcessing eventProcessing)
         {
             _dbContext = dbContext;
             _logsServices = logsServices;
             _eventQueueService = eventQueueService;
             _generateSasLinkService = generateSasLink;
+            _eventProcessingService = eventProcessing;
         }
 
         public async Task<CreateUserResult> CreateUserAsync(User createUser, string nickName, CancellationToken ct)
@@ -31,18 +33,18 @@ namespace SecurityFootageExercise.Infrastructure.Services
 
             if (user == null)
             {
-                 var log = new AuditLog
-                 {
-                     Action = AuditAction.CREATEUSER,
-                     Result = AuditOutcome.USERNOTFOUND,
-                     Nickname = nickName,
-                     CreatedAtUtc = now
-                 };
+                var log = new AuditLog
+                {
+                    Action = AuditAction.CREATEUSER,
+                    Result = AuditOutcome.USERNOTFOUND,
+                    Nickname = nickName,
+                    CreatedAtUtc = now
+                };
                 _logsServices.AddAudit(log);
                 await _dbContext.SaveChangesAsync(ct);
                 return new CreateUserResult(RequestResult.InvalidUser, null);
             }
-            
+
             var isUserExist = await _dbContext.Users.AnyAsync(u => u.Nickname == createUser.Nickname, ct);
 
             if (isUserExist)
@@ -64,20 +66,20 @@ namespace SecurityFootageExercise.Infrastructure.Services
                 CreatedAtUtc = now
             };
 
-             _dbContext.Users.Add(newUser);
-             
-             _logsServices.AddAudit(new AuditLog
-             {
-                 UserId = user.Id,
-                 Action = AuditAction.CREATEUSER,
-                 Result = AuditOutcome.SUCCEEDED,
-                 Nickname = nickName,
-                 CreatedAtUtc = now
-             });
+            _dbContext.Users.Add(newUser);
 
-             await _dbContext.SaveChangesAsync(ct);
+            _logsServices.AddAudit(new AuditLog
+            {
+                UserId = user.Id,
+                Action = AuditAction.CREATEUSER,
+                Result = AuditOutcome.SUCCEEDED,
+                Nickname = nickName,
+                CreatedAtUtc = now
+            });
 
-             return new CreateUserResult(RequestResult.Success, newUser);
+            await _dbContext.SaveChangesAsync(ct);
+
+            return new CreateUserResult(RequestResult.Success, newUser);
         }
 
         public async Task<FootageAccessResponse> RequestFootageAccessAsync(Location location, string nickName, CancellationToken ct)
@@ -86,7 +88,7 @@ namespace SecurityFootageExercise.Infrastructure.Services
 
             Location? savedLocation = null;
             string? sasUrl = null;
-            
+
             RequestResult result = RequestResult.InvalidUser;
             AuditOutcome outcome = AuditOutcome.USERNOTFOUND;
 
@@ -97,8 +99,8 @@ namespace SecurityFootageExercise.Infrastructure.Services
                 result = RequestResult.InvalidAccess;
                 outcome = AuditOutcome.ACCESSDENIED;
 
-                savedLocation = await _dbContext.Locations.FirstOrDefaultAsync(l => 
-                                                            l.Country == location.Country && 
+                savedLocation = await _dbContext.Locations.FirstOrDefaultAsync(l =>
+                                                            l.Country == location.Country &&
                                                             l.City == location.City, ct);
 
                 if (savedLocation == null)
@@ -107,45 +109,45 @@ namespace SecurityFootageExercise.Infrastructure.Services
                 }
                 else
                 {
-                    bool hasAccess = await _dbContext.UserAccesses.AnyAsync(ua => 
+                    bool hasAccess = await _dbContext.UserAccesses.AnyAsync(ua =>
                                                ua.UserId == user.Id &&
                                                ua.LocationId == savedLocation.Id, ct);
 
                     if (hasAccess)
                     {
-                        var footageInfo = await _dbContext.FootagesInfo.FirstOrDefaultAsync(fi => 
-                                                  fi.LocationId == savedLocation.Id, ct);
 
-                        if (footageInfo == null)
+                        await _eventProcessingService.AddAsync(new EventQueue
                         {
-                            result = RequestResult.FootageNotFound;
-                            outcome = AuditOutcome.FOOTAGENOTFOUND;
-                        }
-                        else
+                            UserId = user.Id,
+                            Nickname = nickName,
+                            LocationId = savedLocation.Id,
+                            CreatedAtUtc = now
+                        }, ct);
+
+                        var eventResult = await _eventProcessingService.ProcessEvent(ct);
+
+                        if (eventResult != null)
                         {
-                            try
+                            if (eventResult.Result == RequestResult.FootageNotFound)
                             {
-                                sasUrl = await _generateSasLinkService.GetSasUrlAsync(footageInfo.BlobName, ct);
-
-                                if (string.IsNullOrWhiteSpace(sasUrl))
-                                {
-                                    sasUrl = null;
-                                    result = RequestResult.SasGenerationFailed;
-                                    outcome = AuditOutcome.SASGENERATIONFAILED;
-                                }
-                                else
-                                {
-                                    result = RequestResult.Success;
-                                    outcome = AuditOutcome.SUCCEEDED;
-                                }
+                                outcome = AuditOutcome.FOOTAGENOTFOUND;
+                                result = RequestResult.FootageNotFound;
                             }
-                            catch
+                            else if (eventResult.Result == RequestResult.SasGenerationFailed)
                             {
-                                sasUrl = null;
-                                result = RequestResult.SasGenerationFailed;
                                 outcome = AuditOutcome.SASGENERATIONFAILED;
+                                result = RequestResult.SasGenerationFailed;
+                            }
+                            else if (eventResult.Result == RequestResult.Success && eventResult.IsCleared)
+                            {
+                                result = RequestResult.Success;
+                                outcome = AuditOutcome.SUCCEEDED;
+
+                                sasUrl = eventResult.SasUrl;
                             }
                         }
+
+
                     }
                 }
             }
@@ -162,18 +164,6 @@ namespace SecurityFootageExercise.Infrastructure.Services
                 CreatedAtUtc = now
             });
 
-            if (result == RequestResult.Success && user != null && savedLocation != null)
-            {
-                _eventQueueService.Enqueue(new EventQueue
-                {
-                    UserId = user.Id,
-                    Nickname = user.Nickname,
-                    LocationId = savedLocation.Id,
-                    Status = QueueProcessingStatus.Pending,
-                    CreatedAtUtc = now
-                });
-            }
-
             await _dbContext.SaveChangesAsync(ct);
 
             return new FootageAccessResponse(result, sasUrl);
@@ -184,6 +174,6 @@ namespace SecurityFootageExercise.Infrastructure.Services
             return await _dbContext.Users.FirstOrDefaultAsync(u => u.Nickname == nickName, ct);
         }
 
-        
+
     }
 }
