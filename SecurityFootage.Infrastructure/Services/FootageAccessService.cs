@@ -12,17 +12,13 @@ namespace SecurityFootageExercise.Infrastructure.Services
     {
         private readonly SecurityFootageDbContext _dbContext;
         private readonly IAuditLogService _logsServices;
-        private readonly IEventQueueService _eventQueueService;
-        private readonly SasUrlClient _generateSasLinkService;
         private readonly EventProcessing _eventProcessingService;
 
         public FootageAccessService(SecurityFootageDbContext dbContext, IAuditLogService logsServices,
-                                    IEventQueueService eventQueueService, SasUrlClient generateSasLink, EventProcessing eventProcessing)
+                                    EventProcessing eventProcessing)
         {
             _dbContext = dbContext;
             _logsServices = logsServices;
-            _eventQueueService = eventQueueService;
-            _generateSasLinkService = generateSasLink;
             _eventProcessingService = eventProcessing;
         }
 
@@ -121,7 +117,8 @@ namespace SecurityFootageExercise.Infrastructure.Services
                             UserId = user.Id,
                             Nickname = nickName,
                             LocationId = savedLocation.Id,
-                            CreatedAtUtc = now
+                            CreatedAtUtc = now,
+                            Status = QueueProcessingStatus.Pending
                         }, ct);
 
                         var eventResult = await _eventProcessingService.ProcessEvent(ct);

@@ -14,8 +14,8 @@ namespace SecurityFootageTester
         private static readonly string HeaderName = "NickName";
         private static readonly string RequestBody = """
         {
-            "Country" : "Texas",
-            "City" : "Bay Street Park"
+            "Country" : "Florida",
+            "City" : "Miami"
         }
         """;
 

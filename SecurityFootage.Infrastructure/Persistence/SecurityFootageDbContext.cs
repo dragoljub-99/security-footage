@@ -90,6 +90,10 @@ namespace SecurityFootage.Infrastructure.Persistence
                 entity.Property(x => x.CreatedAtUtc)
                       .IsRequired();
 
+                entity.Property(x => x.Status)
+                      .IsRequired()
+                      .HasConversion<string>();
+
                 entity.HasOne(x => x.User)
                       .WithMany(e => e.EventQueues)
                       .HasForeignKey(u => u.UserId)
